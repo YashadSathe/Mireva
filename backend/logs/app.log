@@ -1,0 +1,6 @@
+2026-10-15 13:24:53 | DEBUG    | [-] [APP] test_logger:15 - Debug test message
+2026-10-15 13:24:53 | INFO     | [-] [APP] test_logger:16 - Info test message
+2026-10-15 13:24:53 | WARNING  | [-] [APP] filter_test:44 - Should appear
+2026-10-15 13:26:12 | DEBUG    | [-] [APP] test_logger:15 - Debug test message
+2026-10-15 13:26:12 | INFO     | [-] [APP] test_logger:16 - Info test message
+2026-10-15 13:26:12 | WARNING  | [-] [APP] filter_test:44 - Should appear

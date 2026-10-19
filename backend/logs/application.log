@@ -1,0 +1,49 @@
+2026-10-15 14:31:31 | DEBUG    | test_logger:15 - Debug test message
+2026-10-15 14:31:31 | INFO     | test_logger:16 - Info test message
+2026-10-15 14:31:31 | WARNING  | filter_test:44 - Should appear
+2026-10-15 14:31:56 | DEBUG    | test_logger:26 - Debug test message
+2026-10-15 14:31:56 | INFO     | test_logger:27 - Info test message
+2026-10-15 14:31:56 | WARNING  | filter_test:55 - Should appear
+2026-10-15 14:33:28 | DEBUG    | test_logger:27 - Debug test message
+2026-10-15 14:33:28 | INFO     | test_logger:28 - Info test message
+2026-10-15 14:33:28 | WARNING  | filter_test:56 - Should appear
+2026-10-15 14:33:50 | DEBUG    | test_logger:27 - Debug test message
+2026-10-15 14:33:50 | INFO     | test_logger:28 - Info test message
+2026-10-15 14:33:50 | WARNING  | filter_test:56 - Should appear
+2026-10-15 14:40:11 | DEBUG    | test_logger:27 - Debug test message
+2026-10-15 14:40:11 | INFO     | test_logger:28 - Info test message
+2026-10-15 14:40:11 | WARNING  | filter_test:56 - Should appear
+2026-10-15 14:40:41 | DEBUG    | test_logger:27 - Debug test message
+2026-10-15 14:40:41 | INFO     | test_logger:28 - Info test message
+2026-10-15 14:40:41 | WARNING  | filter_test:56 - Should appear
+2026-10-15 15:58:40 | DEBUG    | test_logger:27 - Debug test message
+2026-10-15 15:58:40 | INFO     | test_logger:28 - Info test message
+2026-10-15 15:58:40 | WARNING  | filter_test:56 - Should appear
+2026-10-15 16:08:37 | DEBUG    | test_logger:27 - Debug test message
+2026-10-15 16:08:37 | INFO     | test_logger:28 - Info test message
+2026-10-15 16:08:37 | WARNING  | filter_test:56 - Should appear
+2026-10-16 09:41:20 | DEBUG    | test_logger:27 - Debug test message
+2026-10-16 09:41:20 | INFO     | test_logger:28 - Info test message
+2026-10-16 09:41:20 | WARNING  | filter_test:56 - Should appear
+2026-10-16 10:21:49 | DEBUG    | test_logger:27 - Debug test message
+2026-10-16 10:21:49 | INFO     | test_logger:28 - Info test message
+2026-10-16 10:21:49 | WARNING  | filter_test:56 - Should appear
+2026-10-16 10:25:52 | DEBUG    | test_logger:27 - Debug test message
+2026-10-16 10:25:52 | INFO     | test_logger:28 - Info test message
+2026-10-16 10:25:52 | WARNING  | filter_test:56 - Should appear
+2026-10-16 10:28:14 | DEBUG    | test_logger:27 - Debug test message
+2026-10-16 10:28:14 | INFO     | test_logger:28 - Info test message
+2026-10-16 10:28:14 | WARNING  | filter_test:56 - Should appear
+2026-10-16 10:37:22 | INFO     | app.main:80 - Starting Agent MVP (v0.1.0) in 'development' environment
+2026-10-16 10:40:43 | INFO     | app.main:87 - Shutting down Agent MVP
+2026-10-16 10:41:26 | INFO     | app.main:80 - Starting Agent MVP (v0.1.0) in 'development' environment
+2026-10-16 10:42:20 | INFO     | db.session:56 - Initializing SQLAlchemy async engine with pool_pre_ping enabled
+2026-10-16 10:42:22 | ERROR    | db.session:118 - Database session rolled back due to error: (ENOTFOUND) tenant/user postgres.qjixxlglibdkcdslgsgt not found
+2026-10-16 10:44:16 | ERROR    | db.session:118 - Database session rolled back due to error: (ENOTFOUND) tenant/user postgres.qjixxlglibdkcdslgsgt not found
+2026-10-16 10:59:29 | INFO     | app.main:87 - Shutting down Agent MVP
+2026-10-16 10:59:29 | INFO     | db.session:130 - Disposing SQLAlchemy database engine connections
+2026-10-16 10:59:56 | INFO     | app.main:80 - Starting Agent MVP (v0.1.0) in 'development' environment
+2026-10-16 11:01:20 | INFO     | db.session:56 - Initializing SQLAlchemy async engine with pool_pre_ping enabled
+2026-10-16 11:01:25 | INFO     | services.auth_service:149 - User 'yashad1@gmail.com' (id: 9c146648-8f59-4bf8-8759-acd9daed2bc2) logged in successfully
+2026-10-16 11:01:46 | INFO     | services.conversation_service:589 - Switched active workflow for conversation '83b80375-7a9b-48bd-9f53-75b00b06144c' (project 'b41384aa-0918-40f6-90b2-cf2d48f5ac34') to 'recommendation'
+2026-10-16 11:01:47 | INFO     | services.conversation_service:264 - Updated conversation id: 83b80375-7a9b-48bd-9f53-75b00b06144c in project id: b41384aa-0918-40f6-90b2-cf2d48f5ac34 (title: 'Create a BRD for this Project.', workflow: 'recommendation')

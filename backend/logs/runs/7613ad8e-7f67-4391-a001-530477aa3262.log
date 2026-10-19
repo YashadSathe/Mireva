@@ -1,0 +1,28 @@
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:83 - Starting Recommendation Workflow Phase 1 (run_id: 7613ad8e-7f67-4391-a001-530477aa3262, thread_id: conv-wf, brd_id: proj-wf)
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:92 - Executing Step 1A: Load Context (thread_id: conv-wf, brd_id: proj-wf)
+2026-10-15 15:59:02 | INFO     | agents.recommendation.context_loader:88 - Context Loader: Retrieved canonical BRD version '0.1' with 1 sections for project 'proj-wf'
+2026-10-15 15:59:02 | INFO     | agents.recommendation.context_loader:100 - Context Loader: Retrieved 0 prior conversation messages for thread 'conv-wf'
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:104 - Step 1A completed: Loaded 1 canonical sections, history_summary_length=0, prior_decisions=0, focus_entity=None
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:113 - Executing Step 1B: Resolve References against 1 canonical sections
+2026-10-15 15:59:02 | INFO     | agents.recommendation.reference_resolver:265 - Reference Resolver: Identified 1 references for message 'Explain section 6' (focus_entity: 6.0)
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:122 - Step 1B completed: Resolved 1 references: 'section 6' -> section_id=6.0 (confidence=exact)
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:129 - Executing Step 1C: Intent Router Agent invocation
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:137 - Step 1C completed: Intent Router produced decision: profile='explain', high_stakes=False, confidence='high', missing_facts=[], rationale='Explain'
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:147 - Executing Step 1D: Missing/Unclear Check evaluation
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:201 - Phase 1 complete: Profile 'explain' selected (high_stakes=False, confidence=high)
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:152 - Step 1D completed: Workflow result status='ready_for_phase_2'
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:160 - ==================================================
+BRD LLM EXECUTION SUMMARY
+run_id=7613ad8e-7f67-4391-a001-530477aa3262
+total_requests=0
+successful_requests=0
+failed_requests=0
+retry_requests=0
+total_retries=0
+rate_limit_errors=0
+input_tokens=0
+output_tokens=0
+total_tokens=0
+total_llm_time_seconds=0.0
+==================================================
+2026-10-15 15:59:02 | INFO     | agents.recommendation.workflow:162 - Recommendation Workflow Phase 1 finished successfully (run_id: 7613ad8e-7f67-4391-a001-530477aa3262, status: ready_for_phase_2)

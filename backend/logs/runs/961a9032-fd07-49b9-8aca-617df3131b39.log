@@ -1,0 +1,29 @@
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:83 - Starting Recommendation Workflow Phase 1 (run_id: 961a9032-fd07-49b9-8aca-617df3131b39, thread_id: 30440cc5-2e90-4bdd-a60d-a3a3b40525dd, brd_id: 5ea891dc-0401-4928-a820-f629345516b6)
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:92 - Executing Step 1A: Load Context (thread_id: 30440cc5-2e90-4bdd-a60d-a3a3b40525dd, brd_id: 5ea891dc-0401-4928-a820-f629345516b6)
+2026-10-16 10:02:48 | INFO     | services.brd_service:147 - Initialized canonical BRD (id: b646ebfa-1634-4b54-8186-f5f1efe714a6) and working draft (id: 3e800f75-330b-4258-825f-5b78a73a047e) for project '5ea891dc-0401-4928-a820-f629345516b6'
+2026-10-16 10:02:48 | INFO     | agents.recommendation.context_loader:88 - Context Loader: Retrieved canonical BRD version '0.1' with 16 sections for project '5ea891dc-0401-4928-a820-f629345516b6'
+2026-10-16 10:02:48 | INFO     | agents.recommendation.context_loader:100 - Context Loader: Retrieved 1 prior conversation messages for thread '30440cc5-2e90-4bdd-a60d-a3a3b40525dd'
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:104 - Step 1A completed: Loaded 16 canonical sections, history_summary_length=32, prior_decisions=0, focus_entity=None
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:113 - Executing Step 1B: Resolve References against 16 canonical sections
+2026-10-16 10:02:48 | INFO     | agents.recommendation.reference_resolver:265 - Reference Resolver: Identified 0 references for message 'What is the best database?' (focus_entity: None)
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:122 - Step 1B completed: Resolved 0 references: none
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:129 - Executing Step 1C: Intent Router Agent invocation
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:137 - Step 1C completed: Intent Router produced decision: profile='explain', high_stakes=False, confidence='high', missing_facts=[], rationale='Explanation request'
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:147 - Executing Step 1D: Missing/Unclear Check evaluation
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:201 - Phase 1 complete: Profile 'explain' selected (high_stakes=False, confidence=high)
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:152 - Step 1D completed: Workflow result status='ready_for_phase_2'
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:160 - ==================================================
+BRD LLM EXECUTION SUMMARY
+run_id=961a9032-fd07-49b9-8aca-617df3131b39
+total_requests=0
+successful_requests=0
+failed_requests=0
+retry_requests=0
+total_retries=0
+rate_limit_errors=0
+input_tokens=0
+output_tokens=0
+total_tokens=0
+total_llm_time_seconds=0.0
+==================================================
+2026-10-16 10:02:48 | INFO     | agents.recommendation.workflow:162 - Recommendation Workflow Phase 1 finished successfully (run_id: 961a9032-fd07-49b9-8aca-617df3131b39, status: ready_for_phase_2)
