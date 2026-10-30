@@ -9,7 +9,7 @@ from core.config import Settings, get_settings
 def test_default_settings():
     """Verify default settings load cleanly without any external credentials."""
     settings = Settings(_env_file=None)
-    assert settings.APP_NAME == "Agent MVP"
+    assert settings.APP_NAME == "Mireva"
     assert settings.ENVIRONMENT == "development"
     assert settings.LOG_LEVEL == "INFO"
     assert settings.DEBUG is False

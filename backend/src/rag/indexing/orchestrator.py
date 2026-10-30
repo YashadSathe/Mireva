@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import time
 from typing import Any, Optional, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import distinct, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.config import Settings, get_settings
@@ -17,7 +17,6 @@ from exceptions.indexing import (
     InvalidIndexingInputError,
 )
 from models.chunk import ChunkModel
-from models.document import DocumentVersionModel, DocumentVersionStatus
 from rag.acquisition import BaseAcquisitionService, SourceDocument, get_acquisition_service
 from rag.chunking import DocumentChunkingService, get_chunking_service
 from rag.chunking.models import ChunkedDocument
@@ -172,26 +171,16 @@ class EndToEndIndexingService:
         project_id: str,
         document_id: str,
         current_version_id: str,
+        prior_version_ids: Optional[Sequence[str]] = None,
     ) -> int:
-        """Prune prior READY version vector points from Qdrant upon new version indexing success."""
+        """Prune prior version vector points from Qdrant upon new version indexing success."""
         if not self._cleanup_stale_versions:
             return 0
 
-        maker = self._session_maker or get_async_session_maker(settings=self._settings)
         pruned_count = 0
-
         try:
-            async with maker() as session:
-                stmt = select(DocumentVersionModel.id).where(
-                    DocumentVersionModel.document_id == document_id,
-                    DocumentVersionModel.project_id == project_id,
-                    DocumentVersionModel.id != current_version_id,
-                    DocumentVersionModel.status == DocumentVersionStatus.READY.value,
-                )
-                res = await session.execute(stmt)
-                prior_version_ids = res.scalars().all()
-
-            for old_ver_id in prior_version_ids:
+            versions_to_prune = list(prior_version_ids or [])
+            for old_ver_id in versions_to_prune:
                 logger.info(
                     "Pruning superseded version '%s' of doc '%s' from Qdrant (project: '%s')",
                     old_ver_id,
@@ -223,6 +212,7 @@ class EndToEndIndexingService:
         storage_path: str,
         original_filename: str,
         content_type: Optional[str] = None,
+        prior_version_ids: Optional[Sequence[str]] = None,
     ) -> IndexingPipelineReport:
         """Execute the end-to-end RAG indexing pipeline for a specific document version.
 
@@ -413,6 +403,22 @@ class EndToEndIndexingService:
         }
         logger.debug("Stage 9 (Representation Generation) complete for version '%s'", document_version_id)
 
+        # Collect prior versions before PostgreSQL persistence replaces chunks
+        prior_versions: list[str] = list(prior_version_ids or [])
+        if self._cleanup_stale_versions and not prior_versions:
+            try:
+                maker = self._session_maker or get_async_session_maker(settings=self._settings)
+                async with maker() as session:
+                    stmt = select(distinct(ChunkModel.document_version_id)).where(
+                        ChunkModel.document_id == document_id,
+                        ChunkModel.project_id == project_id,
+                        ChunkModel.document_version_id != document_version_id,
+                    )
+                    res = await session.execute(stmt)
+                    prior_versions = [v for v in res.scalars().all() if v]
+            except Exception as exc:
+                logger.debug("Could not query prior chunk versions for doc '%s': %s", document_id, exc)
+
         # ----------------------------------------------------------------------
         # Stage 10: PostgreSQL Chunk Persistence (Atomic Short Transaction)
         # ----------------------------------------------------------------------
@@ -457,6 +463,7 @@ class EndToEndIndexingService:
             project_id=project_id,
             document_id=document_id,
             current_version_id=document_version_id,
+            prior_version_ids=prior_versions,
         )
         stage_reports["stale_version_pruning"] = {
             "pruned_versions_count": stale_pruned,

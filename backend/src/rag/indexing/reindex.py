@@ -3,14 +3,13 @@
 import asyncio
 from typing import Any, Optional, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import distinct, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from core.config import Settings, get_settings
 from db.session import get_async_session_maker
 from exceptions.indexing import IndexingOperationError, InvalidIndexingInputError
 from models.chunk import ChunkModel
-from models.document import DocumentVersionModel, DocumentVersionStatus
 from observability.logging import get_logger
 from rag.chunking.models import DocumentChunk
 from rag.embeddings import BaseEmbeddingProvider, get_embedding_provider
@@ -168,27 +167,25 @@ async def reindex_project_documents(
     session_maker: Optional[async_sessionmaker[AsyncSession]] = None,
     settings: Optional[Settings] = None,
 ) -> list[IndexingReport]:
-    """Re-index all READY document versions belonging to a given project."""
+    """Re-index all document versions belonging to a given project found in PostgreSQL."""
     app_settings = settings or get_settings()
     maker = session_maker or get_async_session_maker(settings=app_settings)
 
     async with maker() as sess:
         stmt = (
-            select(DocumentVersionModel)
-            .where(
-                DocumentVersionModel.project_id == project_id,
-                DocumentVersionModel.status == DocumentVersionStatus.READY.value,
-            )
+            select(ChunkModel.document_id, ChunkModel.document_version_id)
+            .where(ChunkModel.project_id == project_id)
+            .distinct()
         )
         res = await sess.execute(stmt)
-        versions = res.scalars().all()
+        versions = res.all()
 
     reports: list[IndexingReport] = []
-    for ver in versions:
+    for doc_id, ver_id in versions:
         report = await reindex_document_version(
-            project_id=ver.project_id,
-            document_id=ver.document_id,
-            document_version_id=ver.id,
+            project_id=project_id,
+            document_id=doc_id,
+            document_version_id=ver_id,
             session_maker=maker,
             settings=app_settings,
         )

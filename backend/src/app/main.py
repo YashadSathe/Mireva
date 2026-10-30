@@ -2,50 +2,14 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
-
-from core.config import get_settings
-from observability.logging import get_logger, setup_logging
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from api import api_router
+from core.config import get_settings
 from db.session import dispose_engine
-from exceptions.auth import (
-    AuthError,
-    InvalidCredentialsError,
-    InvalidTokenError,
-    RateLimitExceededError,
-    TokenRevokedError,
-    UserAlreadyExistsError,
-    UserInactiveError,
-    UserNotFoundError,
-)
 from exceptions.database import DatabaseError
-from exceptions.document import (
-    DocumentAlreadyProcessingError,
-    DocumentNotFoundError,
-    DocumentProcessingError,
-    DocumentStorageSourceError,
-    DocumentVersionMismatchError,
-    DocumentVersionNotFoundError,
-    InvalidDocumentDataError,
-    InvalidDocumentStateTransitionError,
-    ProjectDocumentMismatchError,
-)
-from exceptions.project import (
-    InvalidProjectDataError,
-    ProjectNotFoundError,
-)
-from exceptions.conversation import (
-    ConversationError,
-    ConversationMessageMismatchError,
-    ConversationNotFoundError,
-    InvalidConversationDataError,
-    InvalidMessageDataError,
-    InvalidMessageRoleError,
-    MessageNotFoundError,
-    ProjectConversationMismatchError,
-)
-
 from exceptions.retrieval import (
     EmptyQueryError,
     InvalidQueryError,
@@ -53,17 +17,9 @@ from exceptions.retrieval import (
     QueryLengthExceededError,
     RetrievalError,
 )
-from exceptions.llm import (
-    LLMAuthenticationError,
-    LLMError,
-    LLMProviderError,
-    LLMRateLimitError,
-    LLMTimeoutError,
-)
 from exceptions.storage import StorageError
-
-from fastapi.responses import JSONResponse
-from fastapi import Request, status
+from exceptions.vector import VectorStoreError
+from observability.logging import get_logger, setup_logging
 
 logger = get_logger(__name__)
 
@@ -85,7 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_application() -> FastAPI:
-    """FastAPI application factory."""
+    """FastAPI application factory for Mireva RAG Foundation."""
     settings = get_settings()
     application = FastAPI(
         title=settings.APP_NAME,
@@ -93,8 +49,6 @@ def create_application() -> FastAPI:
         debug=settings.DEBUG,
         lifespan=lifespan,
     )
-
-    from fastapi.middleware.cors import CORSMiddleware
 
     # Support environment-driven origins while keeping localhost development enabled
     allowed_origins = list(dict.fromkeys(settings.CORS_ORIGINS))
@@ -112,207 +66,22 @@ def create_application() -> FastAPI:
     # --------------------------------------------------------------------------
     # Exception Handlers
     # --------------------------------------------------------------------------
-    @application.exception_handler(InvalidCredentialsError)
-    async def invalid_credentials_handler(request: Request, exc: InvalidCredentialsError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"detail": exc.message},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    @application.exception_handler(InvalidTokenError)
-    async def invalid_token_handler(request: Request, exc: InvalidTokenError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            content={"detail": exc.message},
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    @application.exception_handler(UserAlreadyExistsError)
-    async def user_already_exists_handler(request: Request, exc: UserAlreadyExistsError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"detail": exc.message},
-        )
-
-    @application.exception_handler(UserNotFoundError)
-    async def user_not_found_handler(request: Request, exc: UserNotFoundError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": exc.message},
-        )
-
-    @application.exception_handler(UserInactiveError)
-    async def user_inactive_handler(request: Request, exc: UserInactiveError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={"detail": exc.message},
-        )
-
-    @application.exception_handler(RateLimitExceededError)
-    async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceededError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={"detail": exc.message},
-            headers={"Retry-After": str(exc.retry_after)},
-        )
-
-    @application.exception_handler(ProjectNotFoundError)
-    async def project_not_found_handler(request: Request, exc: ProjectNotFoundError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(DocumentNotFoundError)
-    async def document_not_found_handler(request: Request, exc: DocumentNotFoundError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(DocumentVersionNotFoundError)
-    async def document_version_not_found_handler(
-        request: Request, exc: DocumentVersionNotFoundError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(ProjectDocumentMismatchError)
-    async def project_document_mismatch_handler(
-        request: Request, exc: ProjectDocumentMismatchError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": f"Document '{exc.document_id}' not found in project '{exc.expected_project_id}'."},
-        )
-
-    @application.exception_handler(ConversationNotFoundError)
-    async def conversation_not_found_handler(
-        request: Request, exc: ConversationNotFoundError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(ProjectConversationMismatchError)
-    async def project_conversation_mismatch_handler(
-        request: Request, exc: ProjectConversationMismatchError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": f"Conversation '{exc.conversation_id}' not found in project '{exc.expected_project_id}'."},
-        )
-
-    @application.exception_handler(MessageNotFoundError)
-    async def message_not_found_handler(
-        request: Request, exc: MessageNotFoundError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(ConversationMessageMismatchError)
-    async def conversation_message_mismatch_handler(
-        request: Request, exc: ConversationMessageMismatchError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": f"Message '{exc.message_id}' not found in conversation '{exc.expected_conversation_id}'."},
-        )
-
-    @application.exception_handler(InvalidConversationDataError)
-    async def invalid_conversation_data_handler(
-        request: Request, exc: InvalidConversationDataError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(InvalidMessageDataError)
-    async def invalid_message_data_handler(
-        request: Request, exc: InvalidMessageDataError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(InvalidMessageRoleError)
-    async def invalid_message_role_handler(
-        request: Request, exc: InvalidMessageRoleError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
-        )
-
-
-    @application.exception_handler(InvalidProjectDataError)
-    async def invalid_project_data_handler(request: Request, exc: InvalidProjectDataError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(InvalidDocumentDataError)
-    async def invalid_document_data_handler(request: Request, exc: InvalidDocumentDataError) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(InvalidDocumentStateTransitionError)
-    async def invalid_document_state_transition_handler(
-        request: Request, exc: InvalidDocumentStateTransitionError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(DocumentVersionMismatchError)
-    async def document_version_mismatch_handler(
-        request: Request, exc: DocumentVersionMismatchError
-    ) -> JSONResponse:
-        return JSONResponse(
-            status_code=status.HTTP_404_NOT_FOUND,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(DocumentProcessingError)
-    async def document_processing_error_handler(
-        request: Request, exc: DocumentProcessingError
-    ) -> JSONResponse:
-        logger.error("Document processing error: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": str(exc)},
-        )
-
-    @application.exception_handler(StorageError)
-    async def storage_error_handler(request: Request, exc: StorageError) -> JSONResponse:
-        logger.error("Storage error during request: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            content={"detail": "An object storage operation failed. Please try again."},
-        )
-
-    @application.exception_handler(DatabaseError)
-    async def database_error_handler(request: Request, exc: DatabaseError) -> JSONResponse:
-        logger.error("Database error during request: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "A database error occurred. Please try again later."},
-        )
-
     @application.exception_handler(InvalidQueryError)
     async def invalid_query_handler(request: Request, exc: InvalidQueryError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @application.exception_handler(EmptyQueryError)
+    async def empty_query_handler(request: Request, exc: EmptyQueryError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": str(exc)},
+        )
+
+    @application.exception_handler(QueryLengthExceededError)
+    async def query_length_handler(request: Request, exc: QueryLengthExceededError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": str(exc)},
@@ -335,50 +104,29 @@ def create_application() -> FastAPI:
             content={"detail": f"Retrieval pipeline failed: {exc.message}"},
         )
 
-    @application.exception_handler(LLMTimeoutError)
-    async def llm_timeout_handler(request: Request, exc: LLMTimeoutError) -> JSONResponse:
-        logger.error("LLM provider timed out: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            content={"detail": f"LLM provider request timed out: {exc.message}"},
-        )
-
-    @application.exception_handler(LLMRateLimitError)
-    async def llm_rate_limit_handler(request: Request, exc: LLMRateLimitError) -> JSONResponse:
-        logger.warning("LLM provider rate limit encountered: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={"detail": f"LLM provider rate limit exceeded: {exc.message}"},
-        )
-
-    @application.exception_handler(LLMAuthenticationError)
-    async def llm_auth_error_handler(request: Request, exc: LLMAuthenticationError) -> JSONResponse:
-        logger.error("LLM provider authentication failed: %s", exc)
+    @application.exception_handler(StorageError)
+    async def storage_error_handler(request: Request, exc: StorageError) -> JSONResponse:
+        logger.error("Storage error during request: %s", exc)
         return JSONResponse(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            content={"detail": "LLM provider authentication failed. Check API credentials."},
+            content={"detail": "An object storage operation failed. Please try again."},
         )
 
-    @application.exception_handler(LLMProviderError)
-    async def llm_provider_error_handler(request: Request, exc: LLMProviderError) -> JSONResponse:
-        logger.error("LLM provider error: %s", exc)
-        return JSONResponse(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            content={"detail": f"LLM provider error: {exc.message}"},
-        )
-
-    @application.exception_handler(LLMError)
-    async def llm_error_handler(request: Request, exc: LLMError) -> JSONResponse:
-        logger.error("LLM error: %s", exc)
+    @application.exception_handler(DatabaseError)
+    async def database_error_handler(request: Request, exc: DatabaseError) -> JSONResponse:
+        logger.error("Database error during request: %s", exc)
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": f"LLM inference error: {exc.message}"},
+            content={"detail": "A database error occurred. Please try again later."},
         )
 
-
-
-
-
+    @application.exception_handler(VectorStoreError)
+    async def vector_store_error_handler(request: Request, exc: VectorStoreError) -> JSONResponse:
+        logger.error("Vector store error during request: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            content={"detail": "A vector store operation failed. Please try again later."},
+        )
 
     # --------------------------------------------------------------------------
     # API Routers

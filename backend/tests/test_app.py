@@ -12,7 +12,7 @@ def test_app_startup_and_health_check():
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ok"
-        assert data["app_name"] == "Agent MVP"
+        assert data["app_name"] == "Mireva"
         assert data["environment"] == "development"
 
 
@@ -22,7 +22,7 @@ def test_root_endpoint():
         response = client.get("/")
         assert response.status_code == 200
         data = response.json()
-        assert "Welcome to Agent MVP" in data["message"]
+        assert "Welcome to Mireva" in data["message"]
 
 
 def test_cors_preflight_allowed_origin():
@@ -69,23 +69,24 @@ def test_cors_disallowed_origin():
 
 def test_cors_render_production_origin(monkeypatch):
     """Verify custom Render origin in CORS_ORIGINS is permitted."""
-    monkeypatch.setenv("CORS_ORIGINS", "https://dexmiq-frontend.onrender.com")
+    monkeypatch.setenv("CORS_ORIGINS", "https://mireva-frontend.onrender.com")
     from core.config import get_settings
+
     get_settings.cache_clear()
     from app.main import create_application
+
     prod_app = create_application()
 
     with TestClient(prod_app) as client:
         response = client.options(
             "/health",
             headers={
-                "Origin": "https://dexmiq-frontend.onrender.com",
+                "Origin": "https://mireva-frontend.onrender.com",
                 "Access-Control-Request-Method": "POST",
             },
         )
         assert response.status_code == 200
-        assert response.headers.get("access-control-allow-origin") == "https://dexmiq-frontend.onrender.com"
+        assert response.headers.get("access-control-allow-origin") == "https://mireva-frontend.onrender.com"
         assert response.headers.get("access-control-allow-credentials") == "true"
 
     get_settings.cache_clear()
-

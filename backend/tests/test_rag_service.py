@@ -623,7 +623,6 @@ async def test_retrieval_api_endpoint(mock_retrieval_environment):
     from app.main import create_application
     from api.dependencies import get_rag_service_dependency, get_project_service
     from db.session import get_db_session
-    from models.project import ProjectModel
 
     app = create_application()
 
@@ -639,7 +638,7 @@ async def test_retrieval_api_endpoint(mock_retrieval_environment):
     # Mock ProjectService to confirm project existence
     mock_proj_service = MagicMock()
     mock_proj_service.get_project_by_id = AsyncMock(
-        return_value=ProjectModel(id="proj-1", name="Test Project")
+        return_value={"id": "proj-1", "name": "Test Project"}
     )
     app.dependency_overrides[get_project_service] = lambda: mock_proj_service
 

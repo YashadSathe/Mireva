@@ -1,17 +1,13 @@
 """SQLAlchemy entity model for stored document chunks in the PostgreSQL Content Store."""
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, Index, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from db.base import Base
-
-if TYPE_CHECKING:
-    from models.document import DocumentModel, DocumentVersionModel
-    from models.project import ProjectModel
 
 
 class ChunkModel(Base):
@@ -23,26 +19,11 @@ class ChunkModel(Base):
 
     __tablename__ = "chunks"
 
-    # Identity and Relational Coordinates
+    # Identity and Tracking Coordinates (unconstrained strings; no legacy foreign keys)
     chunk_id: Mapped[str] = mapped_column(String(255), primary_key=True)
-    project_id: Mapped[str] = mapped_column(
-        String(255),
-        ForeignKey("projects.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    document_id: Mapped[str] = mapped_column(
-        String(255),
-        ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    document_version_id: Mapped[Optional[str]] = mapped_column(
-        String(255),
-        ForeignKey("document_versions.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
+    project_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    document_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    document_version_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
 
     # Core Text and Contextual Representations
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -76,20 +57,6 @@ class ChunkModel(Base):
     __table_args__ = (
         Index("ix_chunks_project_id_chunk_id", "project_id", "chunk_id"),
         Index("ix_chunks_project_id_document_id", "project_id", "document_id"),
-    )
-
-    # Relational Hierarchies
-    document_version: Mapped[Optional["DocumentVersionModel"]] = relationship(
-        "DocumentVersionModel",
-        back_populates="chunks",
-    )
-    document: Mapped[Optional["DocumentModel"]] = relationship(
-        "DocumentModel",
-        foreign_keys=[document_id],
-    )
-    project: Mapped[Optional["ProjectModel"]] = relationship(
-        "ProjectModel",
-        foreign_keys=[project_id],
     )
 
     @property

@@ -25,8 +25,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from dataclasses import dataclass
 from core.config import Settings
-from exceptions.document import DocumentProcessingError, ProjectDocumentMismatchError
 from exceptions.embedding import EmbeddingError
 from exceptions.indexing import (
     IndexingError,
@@ -37,8 +37,6 @@ from exceptions.storage import ObjectNotFoundError
 from exceptions.vector import VectorUpsertError
 from models.base import Base
 from models.chunk import ChunkModel
-from models.document import DocumentModel, DocumentVersionModel, DocumentVersionStatus
-from models.project import ProjectModel
 from rag.chunking.models import DocumentChunk
 from rag.embeddings.base import BaseEmbeddingProvider
 from rag.embeddings.models import EmbeddingBatchResult
@@ -57,7 +55,6 @@ from rag.indexing import (
 from rag.contextual_enrichment.models import ContextuallyEnrichedChunk
 from rag.metadata_enrichment.models import ChunkMetadata, EnrichedChunk
 from rag.pipeline.default import DefaultDocumentProcessingPipeline, get_processing_pipeline
-from services.document_processing_service import DocumentProcessingService
 from storage.object.base import BaseObjectStorage
 from storage.object.models import StorageObjectMetadata
 from storage.vector.base import BaseVectorStore
@@ -186,33 +183,45 @@ def make_mock_vector_store() -> AsyncMock:
     return store
 
 
+@dataclass
+class SimpleProject:
+    id: str = "proj-1"
+    name: str = "EndToEnd Indexing Project"
+
+
+@dataclass
+class SimpleDoc:
+    id: str = "doc-1"
+    project_id: str = "proj-1"
+    name: str = "System Architecture Spec"
+
+
+@dataclass
+class SimpleVersion:
+    id: str = "ver-1"
+    document_id: str = "doc-1"
+    project_id: str = "proj-1"
+    version_number: int = 1
+    storage_bucket: str = "documents"
+    storage_path: str = "proj-1/doc-1/v1/spec.md"
+    original_filename: str = "spec.md"
+    content_type: str = "text/markdown"
+    size_bytes: int = 1024
+
+
 async def seed_test_hierarchy(
     session: AsyncSession,
     version_num: int = 1,
-    status: DocumentVersionStatus = DocumentVersionStatus.PENDING,
-) -> tuple[ProjectModel, DocumentModel, DocumentVersionModel]:
-    """Seed Project, Document, and DocumentVersion models."""
-    project = ProjectModel(name="EndToEnd Indexing Project")
-    session.add(project)
-    await session.flush()
-
-    doc = DocumentModel(project_id=project.id, name="System Architecture Spec")
-    session.add(doc)
-    await session.flush()
-
-    version = DocumentVersionModel(
-        document_id=doc.id,
-        project_id=project.id,
+    status: Any = None,
+) -> tuple[SimpleProject, SimpleDoc, SimpleVersion]:
+    """Seed test project, document, and version metadata holders."""
+    project = SimpleProject()
+    doc = SimpleDoc()
+    version = SimpleVersion(
+        id=f"ver-{version_num}",
         version_number=version_num,
-        storage_bucket="documents",
         storage_path=f"{project.id}/{doc.id}/v{version_num}/spec.md",
-        original_filename="spec.md",
-        content_type="text/markdown",
-        size_bytes=1024,
-        status=status.value,
     )
-    session.add(version)
-    await session.commit()
     return project, doc, version
 
 
@@ -526,13 +535,27 @@ async def test_end_to_end_indexing_service_full_workflow():
 async def test_end_to_end_indexing_stale_version_pruning():
     """Verify that when Version 2 is indexed, stale vectors for Version 1 are pruned from Qdrant."""
     async with create_test_db() as (session, session_factory):
-        # 1. Seed Version 1 as READY
-        project, doc, version_1 = await seed_test_hierarchy(
-            session, version_num=1, status=DocumentVersionStatus.READY
+        # 1. Seed Version 1 and persist its chunks into PostgreSQL (ChunkModel)
+        project, doc, version_1 = await seed_test_hierarchy(session, version_num=1)
+        persistence = ChunkPersistenceService(session_maker=session_factory)
+        chunk_v1 = DocumentChunk(
+            chunk_id=f"{doc.id}_chunk_0",
+            document_id=doc.id,
+            project_id=project.id,
+            content="Version 1 content.",
+            index=0,
+            document_version_id=version_1.id,
+        )
+        await persistence.persist_chunks(
+            project_id=project.id,
+            document_id=doc.id,
+            document_version_id=version_1.id,
+            chunks=[chunk_v1],
         )
 
-        # 2. Seed Version 2 as PENDING
-        version_2 = DocumentVersionModel(
+        # 2. Version 2
+        version_2 = SimpleVersion(
+            id="ver-2",
             document_id=doc.id,
             project_id=project.id,
             version_number=2,
@@ -541,10 +564,7 @@ async def test_end_to_end_indexing_stale_version_pruning():
             original_filename="spec.md",
             content_type="text/markdown",
             size_bytes=1024,
-            status=DocumentVersionStatus.PENDING.value,
         )
-        session.add(version_2)
-        await session.commit()
 
         storage = make_mock_storage_with_doc(SAMPLE_MARKDOWN, filename="spec.md")
         mock_vstore = make_mock_vector_store()
@@ -669,14 +689,13 @@ async def test_end_to_end_indexing_batching_verification():
         assert len(mock_vstore.upserted_records) == report.total_chunks
 
 
-# ==============================================================================
-# 3. DocumentProcessingService + DefaultDocumentProcessingPipeline Integration
+# ============================================================================# 3. DefaultDocumentProcessingPipeline Integration
 # ==============================================================================
 
 
 @pytest.mark.anyio
-async def test_document_processing_service_full_pipeline_success():
-    """Verify DocumentProcessingService runs DefaultDocumentProcessingPipeline -> EndToEndIndexingService to READY."""
+async def test_document_processing_pipeline_full_success():
+    """Verify DefaultDocumentProcessingPipeline coordinates end-to-end indexing to Qdrant and PostgreSQL."""
     async with create_test_db() as (session, session_factory):
         project, doc, version = await seed_test_hierarchy(session)
 
@@ -703,35 +722,23 @@ async def test_document_processing_service_full_pipeline_success():
             session_maker=session_factory,
         )
 
-        service = DocumentProcessingService(
-            session_maker=session_factory,
-            storage=storage,
-            pipeline=pipeline,
-        )
-
-        # Trigger lifecycle execution
-        ready_version = await service.process_document_version(
+        # Trigger pipeline execution
+        report = await pipeline.process_document_version(
             project_id=project.id,
             document_id=doc.id,
             document_version_id=version.id,
+            storage_bucket=version.storage_bucket,
+            storage_path=version.storage_path,
+            original_filename=version.original_filename,
+            content_type=version.content_type,
         )
 
-        # 1. State transition assertions
-        assert ready_version.status == DocumentVersionStatus.READY.value
-        assert ready_version.indexed_at is not None
-        assert ready_version.error_message is None
+        assert report["status"] == "success"
+        assert report["document_id"] == doc.id
+        assert report["document_version_id"] == version.id
 
-        # 2. Database verification
+        # 1. Database verification (ChunkModel written)
         async with session_factory() as check_session:
-            db_ver = (
-                await check_session.execute(
-                    select(DocumentVersionModel).where(DocumentVersionModel.id == version.id)
-                )
-            ).scalar_one()
-            assert db_ver.status == DocumentVersionStatus.READY.value
-            assert db_ver.indexed_at is not None
-
-            # Verify chunks were written
             db_chunks = (
                 await check_session.execute(
                     select(ChunkModel).where(ChunkModel.document_id == doc.id)
@@ -739,22 +746,21 @@ async def test_document_processing_service_full_pipeline_success():
             ).scalars().all()
             assert len(db_chunks) > 0
 
-        # 3. Qdrant verification
+        # 2. Qdrant verification
         assert len(mock_vstore.upserted_records) == len(db_chunks)
 
 
 @pytest.mark.anyio
-async def test_document_processing_service_embedding_failure_transitions_to_failed():
-    """Verify that if the embedding provider fails, version transitions to FAILED with sanitized error."""
+async def test_document_processing_pipeline_embedding_failure():
+    """Verify that if the embedding provider fails, pipeline raises EmbeddingError."""
     async with create_test_db() as (session, session_factory):
         project, doc, version = await seed_test_hierarchy(session)
 
         storage = make_mock_storage_with_doc(SAMPLE_MARKDOWN, filename="spec.md")
         mock_vstore = make_mock_vector_store()
-        # Embed provider raises error with simulated secret key leak
         embedding_provider = FakeEmbeddingProvider(
             should_fail=True,
-            fail_message="Voyage API failed: sk-abcdef123456789 connection timed out",
+            fail_message="Embedding connection timed out",
         )
 
         orchestrator = EndToEndIndexingService(
@@ -770,36 +776,21 @@ async def test_document_processing_service_embedding_failure_transitions_to_fail
             session_maker=session_factory,
         )
 
-        service = DocumentProcessingService(
-            session_maker=session_factory,
-            storage=storage,
-            pipeline=pipeline,
-        )
-
-        with pytest.raises(DocumentProcessingError):
-            await service.process_document_version(
+        with pytest.raises(EmbeddingError):
+            await pipeline.process_document_version(
                 project_id=project.id,
                 document_id=doc.id,
                 document_version_id=version.id,
+                storage_bucket=version.storage_bucket,
+                storage_path=version.storage_path,
+                original_filename=version.original_filename,
+                content_type=version.content_type,
             )
-
-        # Check DB state
-        async with session_factory() as check_session:
-            db_ver = (
-                await check_session.execute(
-                    select(DocumentVersionModel).where(DocumentVersionModel.id == version.id)
-                )
-            ).scalar_one()
-            assert db_ver.status == DocumentVersionStatus.FAILED.value
-            assert db_ver.indexed_at is None
-            # Secret must be masked
-            assert "sk-abcdef123456789" not in db_ver.error_message
-            assert "sk-***" in db_ver.error_message
 
 
 @pytest.mark.anyio
-async def test_document_processing_service_qdrant_failure_transitions_to_failed():
-    """Verify that if Qdrant upsert fails, version transitions to FAILED with sanitized error."""
+async def test_document_processing_pipeline_qdrant_failure():
+    """Verify that if Qdrant upsert fails, pipeline raises IndexingOperationError."""
     async with create_test_db() as (session, session_factory):
         project, doc, version = await seed_test_hierarchy(session)
 
@@ -820,27 +811,13 @@ async def test_document_processing_service_qdrant_failure_transitions_to_failed(
             session_maker=session_factory,
         )
 
-        service = DocumentProcessingService(
-            session_maker=session_factory,
-            storage=storage,
-            pipeline=pipeline,
-        )
-
-        with pytest.raises(DocumentProcessingError) as exc_info:
-            await service.process_document_version(
+        with pytest.raises(IndexingError):
+            await pipeline.process_document_version(
                 project_id=project.id,
                 document_id=doc.id,
                 document_version_id=version.id,
-            )
-
-        async with session_factory() as check_session:
-            db_ver = (
-                await check_session.execute(
-                    select(DocumentVersionModel).where(DocumentVersionModel.id == version.id)
-                )
-            ).scalar_one()
-            assert db_ver.status == DocumentVersionStatus.FAILED.value
-            assert (
-                "Indexing partially failed" in db_ver.error_message
-                or "Qdrant cluster unavailable" in db_ver.error_message
+                storage_bucket=version.storage_bucket,
+                storage_path=version.storage_path,
+                original_filename=version.original_filename,
+                content_type=version.content_type,
             )

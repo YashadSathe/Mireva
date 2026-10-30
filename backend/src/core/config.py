@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings and environment configuration."""
+    """Application settings and environment configuration for Mireva RAG Foundation."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     )
 
     # Application Configuration
-    APP_NAME: str = "Agent MVP"
+    APP_NAME: str = "Mireva"
     APP_VERSION: str = "0.1.0"
     ENVIRONMENT: Literal["development", "staging", "production", "test"] = "development"
     LOG_LEVEL: str = "INFO"
@@ -26,8 +26,6 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
-
-    # Integration Placeholders (Optional in Phase 1)
 
     # Supabase (PostgreSQL & Storage)
     SUPABASE_URL: str | None = None
@@ -45,7 +43,7 @@ class Settings(BaseSettings):
     @property
     def supabase_storage_key(self) -> str | None:
         """Return the preferred key for Supabase Storage operations.
-        
+
         Prefers the service role secret key for backend server operations, falling back to SUPABASE_KEY.
         """
         return self.SUPABASE_SERVICE_ROLE_KEY or self.SUPABASE_KEY
@@ -53,7 +51,7 @@ class Settings(BaseSettings):
     @property
     def async_database_url(self) -> str | None:
         """Return the database URL formatted for asynchronous SQLAlchemy access with asyncpg.
-        
+
         Normalizes standard 'postgresql://' or 'postgres://' connection schemes to 'postgresql+asyncpg://'.
         Translates 'sslmode=' parameter to 'ssl=' for asyncpg compatibility.
         """
@@ -67,8 +65,6 @@ class Settings(BaseSettings):
         if "sslmode=" in url:
             url = url.replace("sslmode=", "ssl=")
         return url
-
-
 
     # Qdrant Vector Store & Indexing
     QDRANT_URL: str | None = None
@@ -92,7 +88,7 @@ class Settings(BaseSettings):
     REDIS_URL: str | None = None
     EMBEDDING_CACHE_ENABLED: bool = True
 
-    # LLM Provider & Generation Stage
+    # LLM Provider for Query Transformation
     OPENAI_API_KEY: str | None = None
     LLM_BASE_URL: str | None = None
     LLM_MODEL: str = "gpt-4o"
@@ -101,19 +97,6 @@ class Settings(BaseSettings):
     LLM_RETRY_DELAY: float = 0.5
     LLM_RETRY_BACKOFF: float = 2.0
     LLM_TEMPERATURE: float = 0.0
-    LLM_MAX_TOKENS: int | None = None
-    LLM_TOP_P: float | None = None
-    LLM_STOP_SEQUENCES: list[str] | None = None
-    LLM_STREAMING_ENABLED: bool = False
-
-    # Agent Runtime & OpenRouter Configuration (Phase 2)
-    AGENT_MODEL: str | None = None
-    OPENROUTER_API_KEY: str | None = None
-    OPENROUTER_BASE_URL: str | None = None
-    AGENT_TEMPERATURE: float = 0.0
-    AGENT_MAX_TOKENS: int | None = None
-    AGENT_TIMEOUT: float = 60.0
-    AGENT_MAX_RETRIES: int = 2
 
     # Chunking Configuration
     CHUNK_MAX_SIZE: int = 1000
@@ -145,6 +128,7 @@ class Settings(BaseSettings):
     FUSION_TOP_K: int = 10
     METADATA_FILTERING_ENABLED: bool = True
     METADATA_FILTERING_STRICT_MODE: bool = False
+
     # Reranking Configuration (Jina Reranker v3.5)
     RERANKING_ENABLED: bool = True
     RERANKER_PROVIDER: str = "jina"
@@ -175,17 +159,6 @@ class Settings(BaseSettings):
     # Document Processing Lifecycle Configuration
     AUTO_PROCESS_DOCUMENTS: bool = True
 
-    # Authentication & Security
-    JWT_SECRET_KEY: str = "insecure-default-change-in-production-env-32-bytes"
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
-    # Login Rate Limiting
-    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 5
-    LOGIN_RATE_LIMIT_WINDOW_SECONDS: int = 60
-
-
     @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
     def validate_cors_origins(cls, v: Any) -> list[str]:
@@ -197,6 +170,7 @@ class Settings(BaseSettings):
             if v.startswith("[") and v.endswith("]"):
                 try:
                     import json
+
                     parsed = json.loads(v)
                     if isinstance(parsed, list):
                         return [str(origin).strip() for origin in parsed if str(origin).strip()]
