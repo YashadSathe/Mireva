@@ -2,6 +2,7 @@
 
 This document serves as the complete, authoritative guide to all currently available public HTTP APIs in the application. Every endpoint documented here reflects the active backend routing, Pydantic schemas, database models, and service implementations.
 
+
 ---
 
 ## Table of Contents
